@@ -1,10 +1,10 @@
-package cors
+package example
 
 import (
 	"net/http"
 	"time"
 
-	cors "github.com/OnlyNico43/gin-cors"
+	"github.com/OnlyNico43/gin-cors"
 	"github.com/gin-gonic/gin"
 )
 

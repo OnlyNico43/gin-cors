@@ -101,12 +101,12 @@ The default config for the cors middleware
 */
 func DefaultConfig() Config {
 	return Config{
-		AllowedOrigins: []string{"*"},
-		AllowedMethods: []string{"*"},
-		AllowedHeaders: []string{"Content-Type", "Content-Length"},
-		ExposeHeaders:  []string{"Content-Length"},
+		AllowedOrigins:   []string{"*"},
+		AllowedMethods:   []string{"*"},
+		AllowedHeaders:   []string{"Content-Type", "Content-Length"},
+		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: false,
-		MaxAge: 24 * time.Hour,
+		MaxAge:           24 * time.Hour,
 	}
 }
 
@@ -133,7 +133,7 @@ func CorsMiddleware(config Config) gin.HandlerFunc {
 			// Headers for preflight requests
 			c.Writer.Header().Set("Access-Control-Allow-Methods", strings.Join(config.AllowedMethods, ", "))
 			c.Writer.Header().Set("Access-Control-Allow-Headers", strings.Join(config.AllowedHeaders, ", "))
-			c.Writer.Header().Set("Access-Control-Max-Age", config.MaxAge.String())
+			c.Writer.Header().Set("Access-Control-Max-Age", strconv.FormatInt(int64(config.MaxAge.Seconds()), 10))
 		}
 
 		// Headers for all requests
