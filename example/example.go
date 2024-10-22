@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/onlynico43/gin-cors"
+	"github.com/OnlyNico43/gin-cors"
 	"github.com/gin-gonic/gin"
 )
 
