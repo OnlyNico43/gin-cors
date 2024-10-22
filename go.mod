@@ -1,4 +1,4 @@
-module github.com/OnlyNico43/gin-cors
+module github.com/onlynico43/gin-cors
 
 go 1.23.2
 
