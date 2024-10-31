@@ -128,6 +128,10 @@ func CorsMiddleware(config Config) gin.HandlerFunc {
 			c.AbortWithStatus(http.StatusForbidden)
 		}
 
+		if slices.Contains(config.AllowedOrigins, "*") {
+			currentOrigin = "*"
+		}
+
 		preflight := strings.ToUpper(c.Request.Method) == "OPTIONS"
 		if preflight {
 			// Headers for preflight requests
