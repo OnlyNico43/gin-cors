@@ -133,6 +133,10 @@ func CorsMiddleware(config Config) gin.HandlerFunc {
 			c.AbortWithStatus(http.StatusForbidden)
 		}
 
+		if slices.Contains(config.AllowedOrigins, "*") {
+			currentOrigin = "*"
+		}
+
 		preflight := strings.ToUpper(c.Request.Method) == "OPTIONS"
 		if preflight {
 			// Headers for preflight requests
@@ -142,7 +146,7 @@ func CorsMiddleware(config Config) gin.HandlerFunc {
 		}
 
 		// Headers for all requests
-		c.Writer.Header().Set("Access-Control-Allow-Origin", strings.Join(config.AllowedOrigins, ", "))
+		c.Writer.Header().Set("Access-Control-Allow-Origin", currentOrigin)
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", strconv.FormatBool(config.AllowCredentials))
 		c.Writer.Header().Set("Access-Control-Expose-Headers", strings.Join(config.ExposeHeaders, ", "))
 
