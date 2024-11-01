@@ -92,7 +92,7 @@ func TestCorsMiddleware_MultipleOrigins(t *testing.T) {
 			},
 			expectedCode: http.StatusOK,
 			expectedHeaders: map[string]string{
-				"Access-Control-Allow-Origin":      "http://example1.com, http://example2.com",
+				"Access-Control-Allow-Origin":      "http://example1.com",
 				"Access-Control-Allow-Credentials": "true",
 			},
 		},
@@ -105,7 +105,7 @@ func TestCorsMiddleware_MultipleOrigins(t *testing.T) {
 			},
 			expectedCode: http.StatusOK,
 			expectedHeaders: map[string]string{
-				"Access-Control-Allow-Origin":      "http://example1.com, http://example2.com",
+				"Access-Control-Allow-Origin":      "http://example2.com",
 				"Access-Control-Allow-Credentials": "true",
 			},
 		},
