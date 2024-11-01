@@ -3,35 +3,78 @@ package cors
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 )
 
-func TestCorsMiddleware_DefaultConfig(t *testing.T) {
+// TestCases holds the test configuration and expected results
+type TestCase struct {
+	name            string
+	config          Config
+	method          string
+	requestHeaders  map[string]string
+	expectedCode    int
+	expectedHeaders map[string]string
+}
+
+func setupRouter(config Config) *gin.Engine {
+	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	router.Use(CorsMiddleware(DefaultConfig()))
-	router.GET("/test", func(c *gin.Context) {
+	router.Use(CorsMiddleware(config))
+	router.Any("/test", func(c *gin.Context) {
 		c.String(http.StatusOK, "OK")
 	})
+	return router
+}
 
+func runTestCase(t *testing.T, tc TestCase) {
+	router := setupRouter(tc.config)
 	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("GET", "/test", nil)
-	req.Header.Set("Origin", "http://example.com")
+	req, err := http.NewRequest(tc.method, "/test", nil)
+	require.NoError(t, err)
+
+	// Set request headers
+	for key, value := range tc.requestHeaders {
+		req.Header.Set(key, value)
+	}
 
 	router.ServeHTTP(w, req)
 
-	// Assert that the correct headers are set
-	assert.Equal(t, "*", w.Header().Get("Access-Control-Allow-Origin"))
-	assert.Equal(t, "false", w.Header().Get("Access-Control-Allow-Credentials"))
-	assert.Equal(t, "Content-Length", w.Header().Get("Access-Control-Expose-Headers"))
-	assert.Equal(t, http.StatusOK, w.Code)
+	// Check status code
+	assert.Equal(t, tc.expectedCode, w.Code, "Status code mismatch for test: %s", tc.name)
+
+	// Check response headers
+	for key, expectedValue := range tc.expectedHeaders {
+		assert.Equal(t, expectedValue, w.Header().Get(key),
+			"Header %s mismatch for test: %s", key, tc.name)
+	}
 }
 
-func TestCorsMiddleware_PreflightRequest(t *testing.T) {
+func TestCorsMiddleware_DefaultConfig(t *testing.T) {
+	tc := TestCase{
+		name:   "Default configuration",
+		config: DefaultConfig(),
+		method: "GET",
+		requestHeaders: map[string]string{
+			"Origin": "http://example.com",
+		},
+		expectedCode: http.StatusOK,
+		expectedHeaders: map[string]string{
+			"Access-Control-Allow-Origin":      "*",
+			"Access-Control-Allow-Credentials": "false",
+			"Access-Control-Expose-Headers":    "Content-Length",
+			"Vary":                             "Origin",
+		},
+	}
+	runTestCase(t, tc)
+}
+
+func TestCorsMiddleware_MultipleOrigins(t *testing.T) {
 	config := Config{
-		AllowedOrigins:   []string{"http://example.com"},
+		AllowedOrigins:   []string{"http://example1.com", "http://example2.com"},
 		AllowedMethods:   []string{"GET", "POST"},
 		AllowedHeaders:   []string{"Authorization", "Content-Type"},
 		ExposeHeaders:    []string{"Content-Length"},
@@ -39,90 +82,170 @@ func TestCorsMiddleware_PreflightRequest(t *testing.T) {
 		MaxAge:           10 * time.Minute,
 	}
 
-	router := gin.New()
-	router.Use(CorsMiddleware(config))
+	testCases := []TestCase{
+		{
+			name:   "Allowed origin 1",
+			config: config,
+			method: "GET",
+			requestHeaders: map[string]string{
+				"Origin": "http://example1.com",
+			},
+			expectedCode: http.StatusOK,
+			expectedHeaders: map[string]string{
+				"Access-Control-Allow-Origin":      "http://example1.com, http://example2.com",
+				"Access-Control-Allow-Credentials": "true",
+			},
+		},
+		{
+			name:   "Allowed origin 2",
+			config: config,
+			method: "GET",
+			requestHeaders: map[string]string{
+				"Origin": "http://example2.com",
+			},
+			expectedCode: http.StatusOK,
+			expectedHeaders: map[string]string{
+				"Access-Control-Allow-Origin":      "http://example1.com, http://example2.com",
+				"Access-Control-Allow-Credentials": "true",
+			},
+		},
+		{
+			name:   "Disallowed origin",
+			config: config,
+			method: "GET",
+			requestHeaders: map[string]string{
+				"Origin": "http://example3.com",
+			},
+			expectedCode: http.StatusForbidden,
+		},
+	}
 
-	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("OPTIONS", "/test", nil)
-	req.Header.Set("Origin", "http://example.com")
-	req.Header.Set("Access-Control-Request-Method", "POST")
-
-	router.ServeHTTP(w, req)
-
-	// Assert that the preflight response headers are correctly set
-	assert.Equal(t, "http://example.com", w.Header().Get("Access-Control-Allow-Origin"))
-	assert.Equal(t, "GET, POST", w.Header().Get("Access-Control-Allow-Methods"))
-	assert.Equal(t, "Authorization, Content-Type", w.Header().Get("Access-Control-Allow-Headers"))
-	assert.Equal(t, "600", w.Header().Get("Access-Control-Max-Age"))
-	assert.Equal(t, http.StatusNoContent, w.Code) // 204 for preflight requests
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			runTestCase(t, tc)
+		})
+	}
 }
 
-func TestCorsMiddleware_DisallowedOrigin(t *testing.T) {
+func TestCorsMiddleware_PreflightRequests(t *testing.T) {
 	config := Config{
 		AllowedOrigins:   []string{"http://example.com"},
-		AllowedMethods:   []string{"GET", "POST"},
+		AllowedMethods:   []string{"GET", "POST", "PUT"},
 		AllowedHeaders:   []string{"Authorization", "Content-Type"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
 		MaxAge:           10 * time.Minute,
 	}
 
-	router := gin.New()
-	router.Use(CorsMiddleware(config))
-
-	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("GET", "/test", nil)
-	req.Header.Set("Origin", "http://notallowed.com")
-
-	router.ServeHTTP(w, req)
-
-	// Assert that the request is forbidden due to disallowed origin
-	assert.Equal(t, http.StatusForbidden, w.Code)
-}
-
-func TestCorsMiddleware_AllowCredentials(t *testing.T) {
-	config := Config{
-		AllowedOrigins:   []string{"http://example.com"},
-		AllowedMethods:   []string{"GET"},
-		AllowedHeaders:   []string{"Authorization", "Content-Type"},
-		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true,
-		MaxAge:           10 * time.Minute,
+	testCases := []TestCase{
+		{
+			name:   "Valid preflight request",
+			config: config,
+			method: "OPTIONS",
+			requestHeaders: map[string]string{
+				"Origin":                         "http://example.com",
+				"Access-Control-Request-Method":  "POST",
+				"Access-Control-Request-Headers": "Authorization",
+			},
+			expectedCode: http.StatusNoContent,
+			expectedHeaders: map[string]string{
+				"Access-Control-Allow-Origin":      "http://example.com",
+				"Access-Control-Allow-Methods":     "GET, POST, PUT",
+				"Access-Control-Allow-Headers":     "Authorization, Content-Type",
+				"Access-Control-Allow-Credentials": "true",
+				"Access-Control-Max-Age":           "600",
+			},
+		},
+		{
+			name:   "Preflight with disallowed origin",
+			config: config,
+			method: "OPTIONS",
+			requestHeaders: map[string]string{
+				"Origin":                        "http://unauthorized.com",
+				"Access-Control-Request-Method": "POST",
+			},
+			expectedCode: http.StatusForbidden,
+		},
 	}
 
-	router := gin.New()
-	router.Use(CorsMiddleware(config))
-
-	router.GET("/test", func(c *gin.Context) {
-		c.String(http.StatusOK, "Test succeded")
-	})
-
-	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("GET", "/test", nil)
-	req.Header.Set("Origin", "http://example.com")
-
-	router.ServeHTTP(w, req)
-
-	// Assert that the Allow-Credentials header is set to true
-	assert.Equal(t, "true", w.Header().Get("Access-Control-Allow-Credentials"))
-	assert.Equal(t, http.StatusOK, w.Code)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			runTestCase(t, tc)
+		})
+	}
 }
 
-func TestCorsMiddleware_NoOrigin(t *testing.T) {
-	config := DefaultConfig()
+func TestCorsMiddleware_WildcardValidation(t *testing.T) {
+	assert.Panics(t, func() {
+		config := Config{
+			AllowedOrigins:   []string{"*"},
+			AllowCredentials: true,
+		}
+		config.validate()
+	}, "Should panic when using wildcard with credentials")
 
-	router := gin.New()
-	router.Use(CorsMiddleware(config))
+	assert.NotPanics(t, func() {
+		config := Config{
+			AllowedOrigins:   []string{"http://example.com"},
+			AllowedMethods:   []string{"GET", "POST"},
+			AllowedHeaders:   []string{"ContentType", "ContentLength"},
+			ExposeHeaders:    []string{"ContentType"},
+			AllowCredentials: true,
+		}
+		config.validate()
+	}, "Should not panic with specific origin and credentials")
+}
 
-	router.GET("/test", func(c *gin.Context) {
-		c.String(http.StatusOK, "Test succeded")
-	})
+func TestCorsMiddleware_HeaderValidation(t *testing.T) {
+	testCases := []struct {
+		name           string
+		config         Config
+		shouldPanic    bool
+		expectedConfig Config
+	}{
+		{
+			name: "Default values with no credentials",
+			config: Config{
+				AllowCredentials: false,
+			},
+			shouldPanic: false,
+			expectedConfig: Config{
+				AllowedOrigins:   []string{"*"},
+				AllowedMethods:   []string{"*"},
+				AllowedHeaders:   []string{"*"},
+				ExposeHeaders:    []string{"*"},
+				AllowCredentials: false,
+				MaxAge:           24 * time.Hour,
+			},
+		},
+		{
+			name: "Custom values with credentials",
+			config: Config{
+				AllowedOrigins:   []string{"http://example.com"},
+				AllowedMethods:   []string{"GET", "POST"},
+				AllowedHeaders:   []string{"Authorization"},
+				ExposeHeaders:    []string{"Content-Length"},
+				AllowCredentials: true,
+				MaxAge:           10 * time.Minute,
+			},
+			shouldPanic: false,
+		},
+	}
 
-	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("GET", "/test", nil)
-
-	router.ServeHTTP(w, req)
-
-	// Assert that the request is forbidden when no Origin is present
-	assert.Equal(t, http.StatusForbidden, w.Code)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.shouldPanic {
+				assert.Panics(t, func() {
+					tc.config.validate()
+				})
+			} else {
+				assert.NotPanics(t, func() {
+					validatedConfig := tc.config.validate()
+					if tc.expectedConfig.AllowedOrigins != nil {
+						assert.Equal(t, tc.expectedConfig.AllowedOrigins, validatedConfig.AllowedOrigins)
+					}
+				})
+			}
+		})
+	}
 }

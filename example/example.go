@@ -1,6 +1,7 @@
-package example
+package main
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -9,9 +10,9 @@ import (
 )
 
 func main() {
-  r := gin.Default()
+	r := gin.Default()
 
-  r.Use(cors.CorsMiddleware(cors.Config{
+	r.Use(cors.CorsMiddleware(cors.Config{
 		AllowedOrigins:   []string{"https://foo.bar"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE"},
 		AllowedHeaders:   []string{"Authorization", "Content-Length", "Content-Type"},
@@ -20,9 +21,12 @@ func main() {
 		MaxAge:           12 * time.Hour,
 	}))
 
-  r.GET("/ping", func(c *gin.Context) {
-    c.String(http.StatusOK, "pong")
-  })
+	r.GET("/ping", func(c *gin.Context) {
+		c.String(http.StatusOK, "pong")
+	})
 
-  r.Run(":8080")
+	err := r.Run(":8080")
+	if err != nil {
+		fmt.Printf("Failed to start server due to error: %s", err.Error())
+	}
 }

@@ -4,6 +4,7 @@ This is a cors middleware for the gin http framwork and can be used to configure
 package cors
 
 import (
+	"fmt"
 	"net/http"
 	"slices"
 	"strconv"
@@ -57,28 +58,32 @@ type Config struct {
 Adds wildcard to the array if no value was set.
 Panics if the allowCredentials is true and the header is a wildcard
 */
-func checkCredentials(header []string, allowCredentials bool) []string {
-	if header == nil && !allowCredentials {
-		header = []string{"*"}
-		return header
-	} else if (header == nil || slices.Contains(header, "*")) && allowCredentials {
-		panic("The allowed origins must be set and cannot contain the \"*\" wildcard when AllowCredentials is true")
-	} else {
-		return header
+func checkCredentials(header []string, allowCredentials bool, headerName string) []string {
+	if header == nil || len(header) <= 0 {
+		if allowCredentials {
+			panic(fmt.Sprintf("The %s must be set when AllowCredentials is true", headerName))
+		}
+		return []string{"*"}
 	}
+
+	if slices.Contains(header, "*") && allowCredentials {
+		panic(fmt.Sprintf("The %s cannot contain the \"*\" wildcard when AllowCredentials is true", headerName))
+	}
+
+	return header
 }
 
 /*
 Validates the config and sets empty values to their defaults if necessary
 */
 func (c Config) validate() Config {
-	c.AllowedOrigins = checkCredentials(c.AllowedOrigins, c.AllowCredentials)
+	c.AllowedOrigins = checkCredentials(c.AllowedOrigins, c.AllowCredentials, "allowed origins")
 
-	c.AllowedMethods = checkCredentials(c.AllowedMethods, c.AllowCredentials)
+	c.AllowedMethods = checkCredentials(c.AllowedMethods, c.AllowCredentials, "allowed methods")
 
-	c.AllowedHeaders = checkCredentials(c.AllowedHeaders, c.AllowCredentials)
+	c.AllowedHeaders = checkCredentials(c.AllowedHeaders, c.AllowCredentials, "allowed headers")
 
-	c.ExposeHeaders = checkCredentials(c.ExposeHeaders, c.AllowCredentials)
+	c.ExposeHeaders = checkCredentials(c.ExposeHeaders, c.AllowCredentials, "expose headers")
 
 	if c.MaxAge == 0 {
 		c.MaxAge = 24 * time.Hour

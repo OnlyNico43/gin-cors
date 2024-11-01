@@ -29,7 +29,7 @@ func main() {
 }
 ```
 
-Done now your application is equipped with a basic cors configuration
+Done, now your application is equipped with a basic cors configuration
 
 
 ## How to configure
