@@ -1,6 +1,6 @@
 # Gin Cors Middleware
 
-The gin-cors package can be used in every [Gin](https://github.com/gin-gonic/gin) project and configure the cors behavoiur of your application.
+The gin-cors package can be used in every [Gin](https://github.com/gin-gonic/gin) project and configure the cors behaviour of your application.
 
 ## Getting started
 After installing and setting up Go you can create yor first project with gin.

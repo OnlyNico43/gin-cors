@@ -1,13 +1,14 @@
 package cors
 
 import (
-	"github.com/gin-gonic/gin"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestCases holds the test configuration and expected results
@@ -244,6 +245,170 @@ func TestCorsMiddleware_HeaderValidation(t *testing.T) {
 					if tc.expectedConfig.AllowedOrigins != nil {
 						assert.Equal(t, tc.expectedConfig.AllowedOrigins, validatedConfig.AllowedOrigins)
 					}
+				})
+			}
+		})
+	}
+}
+
+func TestCorsMiddleware_MethodValidation(t *testing.T) {
+	config := Config{
+		AllowedOrigins:   []string{"http://example.com"},
+		AllowedMethods:   []string{"GET", "POST"}, // Only GET and POST are allowed
+		AllowedHeaders:   []string{"Authorization", "Content-Type"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           10 * time.Minute,
+	}
+
+	testCases := []TestCase{
+		{
+			name:   "Allowed method - GET",
+			config: config,
+			method: "GET",
+			requestHeaders: map[string]string{
+				"Origin": "http://example.com",
+			},
+			expectedCode: http.StatusOK,
+			expectedHeaders: map[string]string{
+				"Access-Control-Allow-Origin":      "http://example.com",
+				"Access-Control-Allow-Credentials": "true",
+			},
+		},
+		{
+			name:   "Allowed method - POST",
+			config: config,
+			method: "POST",
+			requestHeaders: map[string]string{
+				"Origin": "http://example.com",
+			},
+			expectedCode: http.StatusOK,
+			expectedHeaders: map[string]string{
+				"Access-Control-Allow-Origin":      "http://example.com",
+				"Access-Control-Allow-Credentials": "true",
+			},
+		},
+		{
+			name:   "Disallowed method - PUT",
+			config: config,
+			method: "PUT",
+			requestHeaders: map[string]string{
+				"Origin": "http://example.com",
+			},
+			expectedCode: http.StatusMethodNotAllowed,
+			expectedHeaders: map[string]string{
+				"Access-Control-Allow-Origin":      "http://example.com",
+				"Access-Control-Allow-Credentials": "true",
+			},
+		},
+		{
+			name:   "Disallowed method - DELETE",
+			config: config,
+			method: "DELETE",
+			requestHeaders: map[string]string{
+				"Origin": "http://example.com",
+			},
+			expectedCode: http.StatusMethodNotAllowed,
+			expectedHeaders: map[string]string{
+				"Access-Control-Allow-Origin":      "http://example.com",
+				"Access-Control-Allow-Credentials": "true",
+			},
+		},
+		{
+			name:   "Preflight with allowed method",
+			config: config,
+			method: "OPTIONS",
+			requestHeaders: map[string]string{
+				"Origin":                        "http://example.com",
+				"Access-Control-Request-Method": "POST",
+			},
+			expectedCode: http.StatusNoContent,
+			expectedHeaders: map[string]string{
+				"Access-Control-Allow-Origin":      "http://example.com",
+				"Access-Control-Allow-Methods":     "GET, POST",
+				"Access-Control-Allow-Credentials": "true",
+				"Access-Control-Max-Age":           "600",
+			},
+		},
+		{
+			name: "Wildcard methods test",
+			config: Config{
+				AllowedOrigins:   []string{"http://example.com"},
+				AllowedMethods:   []string{"*"},
+				AllowCredentials: false,
+			},
+			method: "PUT", // Should be allowed because of wildcard
+			requestHeaders: map[string]string{
+				"Origin": "http://example.com",
+			},
+			expectedCode: http.StatusOK,
+			expectedHeaders: map[string]string{
+				"Access-Control-Allow-Origin":      "http://example.com",
+				"Access-Control-Allow-Credentials": "false",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			runTestCase(t, tc)
+		})
+	}
+}
+
+func TestCorsMiddleware_MethodValidationEdgeCases(t *testing.T) {
+	testCases := []struct {
+		name        string
+		config      Config
+		shouldPanic bool
+	}{
+		{
+			name: "Empty methods list",
+			config: Config{
+				AllowedOrigins:   []string{"http://example.com"},
+				AllowedMethods:   []string{},
+				AllowCredentials: true,
+			},
+			shouldPanic: true,
+		},
+		{
+			name: "Invalid HTTP method",
+			config: Config{
+				AllowedOrigins:   []string{"http://example.com"},
+				AllowedMethods:   []string{"GET", "INVALID_METHOD"},
+				AllowCredentials: true,
+			},
+			shouldPanic: true,
+		},
+		{
+			name: "Duplicate methods",
+			config: Config{
+				AllowedOrigins:   []string{"http://example.com"},
+				AllowedMethods:   []string{"GET", "GET", "POST"},
+				AllowCredentials: true,
+			},
+			shouldPanic: true,
+		},
+		{
+			name: "Case sensitivity test",
+			config: Config{
+				AllowedOrigins:   []string{"http://example.com"},
+				AllowedMethods:   []string{"get", "POST"},
+				AllowCredentials: true,
+			},
+			shouldPanic: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.shouldPanic {
+				assert.Panics(t, func() {
+					tc.config.validate()
+				})
+			} else {
+				assert.NotPanics(t, func() {
+					tc.config.validate()
 				})
 			}
 		})

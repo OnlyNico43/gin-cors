@@ -85,6 +85,12 @@ func (c Config) validate() Config {
 
 	c.ExposeHeaders = checkCredentials(c.ExposeHeaders, c.AllowCredentials, "expose headers")
 
+	for i, method := range c.AllowedMethods {
+		c.AllowedMethods[i] = strings.ToUpper(method)
+	}
+
+	c.AllowedMethods = slices.Compact(c.AllowedMethods)
+
 	if c.MaxAge == 0 {
 		c.MaxAge = 24 * time.Hour
 	}
@@ -133,11 +139,16 @@ func CorsMiddleware(config Config) gin.HandlerFunc {
 			c.AbortWithStatus(http.StatusForbidden)
 		}
 
+		var method = strings.ToUpper(c.Request.Method)
+		if !slices.Contains(config.AllowedMethods, "*") && !slices.Contains(config.AllowedMethods, method) && method != "OPTIONS" {
+			c.AbortWithStatus(http.StatusMethodNotAllowed)
+		}
+
 		if slices.Contains(config.AllowedOrigins, "*") {
 			currentOrigin = "*"
 		}
 
-		preflight := strings.ToUpper(c.Request.Method) == "OPTIONS"
+		var preflight = method == "OPTIONS"
 		if preflight {
 			// Headers for preflight requests
 			c.Writer.Header().Set("Access-Control-Allow-Methods", strings.Join(config.AllowedMethods, ", "))
