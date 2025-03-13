@@ -59,7 +59,7 @@ Adds wildcard to the array if no value was set.
 Panics if the allowCredentials is true and the header is a wildcard
 */
 func checkCredentials(header []string, allowCredentials bool, headerName string) []string {
-	if header == nil || len(header) <= 0 {
+	if len(header) <= 0 {
 		if allowCredentials {
 			panic(fmt.Sprintf("The %s must be set when AllowCredentials is true", headerName))
 		}
