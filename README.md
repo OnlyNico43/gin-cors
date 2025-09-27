@@ -19,7 +19,7 @@ import (
 func main() {
   r := gin.Default()
 
-  r.Use(cors.CorsMiddleware(cors.DefaultConfig()))
+  r.Use(cors.Middleware(cors.DefaultConfig()))
 
   r.GET("/ping", func(c *gin.Context) {
     c.String(http.StatusOK, "pong")
