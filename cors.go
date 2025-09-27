@@ -1,6 +1,4 @@
-/*
-This is a cors middleware for the gin http framwork and can be used to configure the cors behaviour of your application
-*/
+// Package cors provides a CORS middleware for the Gin web framework.
 package cors
 
 import (
@@ -14,9 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-/*
-Defines the configuration of your cors middleware
-*/
+// Config is the configuration for the cors middleware.
 type Config struct {
 	// All the allowed origins in an array. The default is "*"
 	// The default cannot be used when AllowCredentials is true
@@ -54,10 +50,8 @@ type Config struct {
 	MaxAge time.Duration
 }
 
-/*
-Adds wildcard to the array if no value was set.
-Panics if the allowCredentials is true and the header is a wildcard
-*/
+// checkCredentials adds wildcard to the array if no value was set.
+// Panics if the allowCredentials is true and the header is a wildcard.
 func checkCredentials(header []string, allowCredentials bool, headerName string) []string {
 	if len(header) <= 0 {
 		if allowCredentials {
@@ -67,15 +61,17 @@ func checkCredentials(header []string, allowCredentials bool, headerName string)
 	}
 
 	if slices.Contains(header, "*") && allowCredentials {
-		panic(fmt.Sprintf("The %s cannot contain the \"*\" wildcard when AllowCredentials is true", headerName))
+		panic(
+			fmt.Sprintf(
+				"The %s cannot contain the \"*\" wildcard when AllowCredentials is true",
+				headerName,
+			),
+		)
 	}
 
 	return header
 }
 
-/*
-Validates the config and sets empty values to their defaults if necessary
-*/
 func (c Config) validate() Config {
 	c.AllowedOrigins = checkCredentials(c.AllowedOrigins, c.AllowCredentials, "allowed origins")
 
@@ -98,18 +94,7 @@ func (c Config) validate() Config {
 	return c
 }
 
-/*
-The default config for the cors middleware
-
-	Config{
-		AllowedOrigins: []string{"*"},
-		AllowedMethods: []string{"*"},
-		AllowedHeaders: []string{"Authorization", "Conten-Type", "Content-Length"},
-		ExposeHeaders:  []string{"Content-Length"},
-		AllowCredentials: false,
-		MaxAge: 24 * time.Hour,
-	}
-*/
+// DefaultConfig returns a default cors config.
 func DefaultConfig() Config {
 	return Config{
 		AllowedOrigins:   []string{"*"},
@@ -121,11 +106,9 @@ func DefaultConfig() Config {
 	}
 }
 
-/*
-CORS Middleware for Gin which handles CORS headers and preflight requests
-needs a cors config
-*/
-func CorsMiddleware(config Config) gin.HandlerFunc {
+// Middleware returns a CORS Middleware for Gin which handles CORS headers and preflight requests.
+// Needs a cors config.
+func Middleware(config Config) gin.HandlerFunc {
 	config = config.validate()
 	return func(c *gin.Context) {
 		currentOrigin := c.Request.Header.Get("Origin")
@@ -135,12 +118,15 @@ func CorsMiddleware(config Config) gin.HandlerFunc {
 			c.AbortWithStatus(http.StatusForbidden)
 		}
 
-		if !slices.Contains(config.AllowedOrigins, "*") && !slices.Contains(config.AllowedOrigins, currentOrigin) {
+		if !slices.Contains(config.AllowedOrigins, "*") &&
+			!slices.Contains(config.AllowedOrigins, currentOrigin) {
 			c.AbortWithStatus(http.StatusForbidden)
 		}
 
 		var method = strings.ToUpper(c.Request.Method)
-		if !slices.Contains(config.AllowedMethods, "*") && !slices.Contains(config.AllowedMethods, method) && method != "OPTIONS" {
+		if !slices.Contains(config.AllowedMethods, "*") &&
+			!slices.Contains(config.AllowedMethods, method) &&
+			method != "OPTIONS" {
 			c.AbortWithStatus(http.StatusMethodNotAllowed)
 		}
 
@@ -151,15 +137,20 @@ func CorsMiddleware(config Config) gin.HandlerFunc {
 		var preflight = method == "OPTIONS"
 		if preflight {
 			// Headers for preflight requests
-			c.Writer.Header().Set("Access-Control-Allow-Methods", strings.Join(config.AllowedMethods, ", "))
-			c.Writer.Header().Set("Access-Control-Allow-Headers", strings.Join(config.AllowedHeaders, ", "))
-			c.Writer.Header().Set("Access-Control-Max-Age", strconv.FormatInt(int64(config.MaxAge.Seconds()), 10))
+			c.Writer.Header().
+				Set("Access-Control-Allow-Methods", strings.Join(config.AllowedMethods, ", "))
+			c.Writer.Header().
+				Set("Access-Control-Allow-Headers", strings.Join(config.AllowedHeaders, ", "))
+			c.Writer.Header().
+				Set("Access-Control-Max-Age", strconv.FormatInt(int64(config.MaxAge.Seconds()), 10))
 		}
 
 		// Headers for all requests
 		c.Writer.Header().Set("Access-Control-Allow-Origin", currentOrigin)
-		c.Writer.Header().Set("Access-Control-Allow-Credentials", strconv.FormatBool(config.AllowCredentials))
-		c.Writer.Header().Set("Access-Control-Expose-Headers", strings.Join(config.ExposeHeaders, ", "))
+		c.Writer.Header().
+			Set("Access-Control-Allow-Credentials", strconv.FormatBool(config.AllowCredentials))
+		c.Writer.Header().
+			Set("Access-Control-Expose-Headers", strings.Join(config.ExposeHeaders, ", "))
 
 		if preflight {
 			// If this is a preflight request we don't need to continue

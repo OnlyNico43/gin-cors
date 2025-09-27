@@ -1,0 +1,22 @@
+version: "2"
+linters:
+  enable:
+    - decorder
+    - dupl
+    - err113
+    - errcheck
+    - funcorder
+    - godot
+    - govet
+    - ineffassign
+    - misspell
+    - revive
+    - staticcheck
+    - unconvert
+    - unused
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+    - golines

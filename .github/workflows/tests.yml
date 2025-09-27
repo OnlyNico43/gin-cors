@@ -3,27 +3,21 @@ name: Run Tests
 on: ["push", "pull_request"]
 
 jobs:
-  format:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-      - name: format
-        run: go fmt
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
       - name: test
         env:
           GIN_MODE: release
         run: go test
-  lint:
+  lint-format:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+      - uses: golangci/golangci-lint-action@v8
       
+      - name: lint
+        run: golangci-lint run

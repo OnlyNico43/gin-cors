@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestCases holds the test configuration and expected results
+// TestCases holds the test configuration and expected results.
 type TestCase struct {
 	name            string
 	config          Config
@@ -24,7 +24,7 @@ type TestCase struct {
 func setupRouter(config Config) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	router.Use(CorsMiddleware(config))
+	router.Use(Middleware(config))
 	router.Any("/test", func(c *gin.Context) {
 		c.String(http.StatusOK, "OK")
 	})

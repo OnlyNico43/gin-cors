@@ -1,3 +1,4 @@
+// Package main is a example application for the cors middleware for the gin framework
 package main
 
 import (
@@ -12,7 +13,7 @@ import (
 func main() {
 	r := gin.Default()
 
-	r.Use(cors.CorsMiddleware(cors.Config{
+	r.Use(cors.Middleware(cors.Config{
 		AllowedOrigins:   []string{"https://foo.bar"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE"},
 		AllowedHeaders:   []string{"Authorization", "Content-Length", "Content-Type"},
