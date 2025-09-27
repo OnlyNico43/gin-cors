@@ -13,7 +13,7 @@ import (
   "net/http"
 
   "github.com/gin-gonic/gin"
-  cors "github.com/OnlyNico43/gin-cors"
+  cors "github.com/OnlyNico43/gin-cors/v2"
 )
 
 func main() {
