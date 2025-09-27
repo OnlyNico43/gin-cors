@@ -1,8 +1,9 @@
-module github.com/OnlyNico43/gin-cors
+module github.com/OnlyNico43/gin-cors/v2
 
 go 1.25.1
 
 require (
+	github.com/OnlyNico43/gin-cors v1.0.7
 	github.com/gin-gonic/gin v1.11.0
 	github.com/stretchr/testify v1.11.1
 )
