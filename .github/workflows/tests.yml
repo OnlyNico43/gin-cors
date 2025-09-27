@@ -8,6 +8,8 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v6
+        with:
+          go-version: "^1.25.1"
       - name: test
         env:
           GIN_MODE: release
@@ -17,7 +19,9 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v6
+        with:
+          go-version: "^1.25.1"
       - uses: golangci/golangci-lint-action@v8
-      
+
       - name: lint
         run: golangci-lint run
