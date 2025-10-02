@@ -1,6 +1,6 @@
 module github.com/OnlyNico43/gin-cors/v2
 
-go 1.25.1
+go 1.24.7
 
 require (
 	github.com/gin-gonic/gin v1.11.0
