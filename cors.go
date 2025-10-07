@@ -114,8 +114,10 @@ func Middleware(config Config) gin.HandlerFunc {
 		currentOrigin := c.Request.Header.Get("Origin")
 		c.Writer.Header().Set("Vary", "Origin")
 
+		// If no origin is set we skip the CORS handling
 		if currentOrigin == "" {
-			c.AbortWithStatus(http.StatusForbidden)
+			c.Next()
+			return
 		}
 
 		if !slices.Contains(config.AllowedOrigins, "*") &&
