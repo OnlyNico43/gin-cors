@@ -14,12 +14,19 @@ import (
 
 // Config is the configuration for the cors middleware.
 type Config struct {
-	// All the allowed origins in an array. The default is "*"
-	// The default cannot be used when AllowCredentials is true
+	// All the allowed origins in an array. The default is "*".
+	// The default cannot be used when AllowCredentials is true.
+	// This array will have no effect if the AllowedOriginsFunc is used.
 	// [MDN Web Docs]
 	//
 	// [MDN Web Docs]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Allow-Origin
 	AllowedOrigins []string
+	// A function to dynamically check if an origin is allowed.
+	// The first return value indicates if the origin is allowed.
+	// The second determines if the AllowCredentials header should be set.
+	//
+	// This can be used for dynamic client evaluation instead of using the AllowedOrigins slice.
+	AllowedOriginsFunc func(origin string) (bool, bool)
 	// All the allowed HTTP Methodes. The default is "*"
 	// The default cannot be used when AllowCredentials is true
 	// [MDN Web Docs]
@@ -38,7 +45,8 @@ type Config struct {
 	//
 	// [MDN Web Docs]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Expose-Headers
 	ExposeHeaders []string
-	// If you allow receiving cookies and Authorization headers. The default is false
+	// If you allow receiving cookies and Authorization headers. The default is false.
+	// This will have no effect if the AllowedOriginsFunc is used.
 	// [MDN Web Docs]
 	//
 	// [MDN Web Docs]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Allow-Credentials
@@ -72,7 +80,7 @@ func checkCredentials(header []string, allowCredentials bool, headerName string)
 	return header
 }
 
-func (c Config) validate() Config {
+func (c *Config) validate() *Config {
 	c.AllowedOrigins = checkCredentials(c.AllowedOrigins, c.AllowCredentials, "allowed origins")
 
 	c.AllowedMethods = checkCredentials(c.AllowedMethods, c.AllowCredentials, "allowed methods")
@@ -95,8 +103,8 @@ func (c Config) validate() Config {
 }
 
 // DefaultConfig returns a default cors config.
-func DefaultConfig() Config {
-	return Config{
+func DefaultConfig() *Config {
+	return &Config{
 		AllowedOrigins:   []string{"*"},
 		AllowedMethods:   []string{"*"},
 		AllowedHeaders:   []string{"Content-Type", "Content-Length"},
@@ -108,55 +116,77 @@ func DefaultConfig() Config {
 
 // Middleware returns a CORS Middleware for Gin which handles CORS headers and preflight requests.
 // Needs a cors config.
-func Middleware(config Config) gin.HandlerFunc {
+func Middleware(config *Config) gin.HandlerFunc {
 	config = config.validate()
+
 	return func(c *gin.Context) {
-		currentOrigin := c.Request.Header.Get("Origin")
+		origin := c.Request.Header.Get("Origin")
 		c.Writer.Header().Set("Vary", "Origin")
 
 		// If no origin is set we skip the CORS handling
-		if currentOrigin == "" {
+		if origin == "" {
 			c.Next()
 			return
 		}
 
-		if !slices.Contains(config.AllowedOrigins, "*") &&
-			!slices.Contains(config.AllowedOrigins, currentOrigin) {
-			c.AbortWithStatus(http.StatusForbidden)
+		// Check origin and determine credentials based on config or function
+		var allowCredentials bool
+
+		if config.AllowedOriginsFunc != nil {
+			// Use dynamic function for origin validation
+			allowed, funcAllowCredentials := config.AllowedOriginsFunc(origin)
+			if !allowed {
+				c.AbortWithStatus(http.StatusForbidden)
+				return
+			}
+			allowCredentials = funcAllowCredentials
+		} else {
+			// Use static origin list for validation
+			if !slices.Contains(config.AllowedOrigins, "*") &&
+				!slices.Contains(config.AllowedOrigins, origin) {
+				c.AbortWithStatus(http.StatusForbidden)
+				return
+			}
+
+			// Use wildcard origin if configured
+			if slices.Contains(config.AllowedOrigins, "*") {
+				origin = "*"
+			}
+
+			allowCredentials = config.AllowCredentials
 		}
 
-		var method = strings.ToUpper(c.Request.Method)
-		if !slices.Contains(config.AllowedMethods, "*") &&
-			!slices.Contains(config.AllowedMethods, method) &&
-			method != "OPTIONS" {
-			c.AbortWithStatus(http.StatusMethodNotAllowed)
-		}
+		// Check if method is allowed
+		method := strings.ToUpper(c.Request.Method)
+		methodAllowed := slices.Contains(config.AllowedMethods, "*") ||
+			slices.Contains(config.AllowedMethods, method) ||
+			method == "OPTIONS"
 
-		if slices.Contains(config.AllowedOrigins, "*") {
-			currentOrigin = "*"
-		}
+		// Check if this is a preflight request
+		isPreflight := method == "OPTIONS"
 
-		var preflight = method == "OPTIONS"
-		if preflight {
-			// Headers for preflight requests
+		// Set CORS headers
+		c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
+		c.Writer.Header().
+			Set("Access-Control-Allow-Credentials", strconv.FormatBool(allowCredentials))
+		c.Writer.Header().
+			Set("Access-Control-Expose-Headers", strings.Join(config.ExposeHeaders, ", "))
+
+		if isPreflight {
+			// Additional headers for preflight requests
 			c.Writer.Header().
 				Set("Access-Control-Allow-Methods", strings.Join(config.AllowedMethods, ", "))
 			c.Writer.Header().
 				Set("Access-Control-Allow-Headers", strings.Join(config.AllowedHeaders, ", "))
 			c.Writer.Header().
 				Set("Access-Control-Max-Age", strconv.FormatInt(int64(config.MaxAge.Seconds()), 10))
+			c.AbortWithStatus(http.StatusNoContent)
+			return
 		}
 
-		// Headers for all requests
-		c.Writer.Header().Set("Access-Control-Allow-Origin", currentOrigin)
-		c.Writer.Header().
-			Set("Access-Control-Allow-Credentials", strconv.FormatBool(config.AllowCredentials))
-		c.Writer.Header().
-			Set("Access-Control-Expose-Headers", strings.Join(config.ExposeHeaders, ", "))
-
-		if preflight {
-			// If this is a preflight request we don't need to continue
-			c.AbortWithStatus(204)
+		if !methodAllowed {
+			c.AbortWithStatus(http.StatusMethodNotAllowed)
+			return
 		}
 
 		c.Next()

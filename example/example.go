@@ -13,7 +13,7 @@ import (
 func main() {
 	r := gin.Default()
 
-	r.Use(cors.Middleware(cors.Config{
+	r.Use(cors.Middleware(&cors.Config{
 		AllowedOrigins:   []string{"https://foo.bar"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE"},
 		AllowedHeaders:   []string{"Authorization", "Content-Length", "Content-Type"},
